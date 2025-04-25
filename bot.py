@@ -1,33 +1,30 @@
-from flask import Flask
-from threading import Thread
-from telegram.ext import Updater, CommandHandler
+from flask import Flask, request
+from telegram import Bot, Update
+from telegram.ext import Dispatcher, CommandHandler
 import os
 
-# Twój token z Rendera (przez zmienną środowiskową)
 TOKEN = os.getenv("BOT_TOKEN")
+bot = Bot(token=TOKEN)
 
-# Flask app, żeby Render widział otwarty port
-app = Flask('')
+app = Flask(__name__)
+dispatcher = Dispatcher(bot, None, workers=0)
+
+# Komenda start
+def start(update, context):
+    update.message.reply_text("Bot działa!")
+
+dispatcher.add_handler(CommandHandler("start", start))
+
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return "ok"
 
 @app.route('/')
-def home():
-    return "Bot działa!"
+def index():
+    return "Bot jest aktywny"
 
-def run_flask():
-    app.run(host='0.0.0.0', port=8080)
-
-# Funkcja startowa dla Telegram bota
-def start(update, context):
-    update.message.reply_text("Cześć! Jestem gotowy do działania.")
-
-def run_telegram():
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
-    updater.start_polling()
-    updater.idle()
-
-# Odpal Flask i bota jednocześnie
 if __name__ == '__main__':
-    Thread(target=run_flask).start()
-    run_telegram()
+    bot.set_webhook(url=f"https://<TWOJA-NAZWA>.onrender.com/{TOKEN}")
+    app.run(host="0.0.0.0", port=10000)

@@ -1,36 +1,33 @@
 from flask import Flask
-import threading
-import time
-import requests
-from bs4 import BeautifulSoup
-from telegram import Bot
+from threading import Thread
+from telegram.ext import Updater, CommandHandler
+import os
 
-app = Flask(__name__)
+# Twój token z Rendera (przez zmienną środowiskową)
+TOKEN = os.getenv("BOT_TOKEN")
 
-TELEGRAM_TOKEN = 'TU_WSTAW_TOKEN'
-CHAT_ID = 'TU_WSTAW_CHAT_ID'
-
-bot = Bot(token=TELEGRAM_TOKEN)
-
-def track_olx():
-    while True:
-        try:
-            url = "https://www.olx.pl/motoryzacja/maszyny-rolnicze/koparki/"
-            response = requests.get(url)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            first_offer = soup.find('div', {'data-cy': 'l-card'})
-            if first_offer:
-                title = first_offer.find('h6')
-                if title:
-                    bot.send_message(chat_id=CHAT_ID, text=f"Nowa oferta: {title.text.strip()}")
-        except Exception as e:
-            print(f"Błąd: {e}")
-        time.sleep(600)
+# Flask app, żeby Render widział otwarty port
+app = Flask('')
 
 @app.route('/')
 def home():
     return "Bot działa!"
 
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
+
+# Funkcja startowa dla Telegram bota
+def start(update, context):
+    update.message.reply_text("Cześć! Jestem gotowy do działania.")
+
+def run_telegram():
+    updater = Updater(TOKEN, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start))
+    updater.start_polling()
+    updater.idle()
+
+# Odpal Flask i bota jednocześnie
 if __name__ == '__main__':
-    threading.Thread(target=track_olx).start()
-    app.run(host='0.0.0.0', port=10000)
+    Thread(target=run_flask).start()
+    run_telegram()

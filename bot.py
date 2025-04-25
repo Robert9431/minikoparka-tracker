@@ -1,40 +1,36 @@
-import requests
+from flask import Flask
+import threading
 import time
+import requests
 from bs4 import BeautifulSoup
-import telegram
+from telegram import Bot
 
-TELEGRAM_TOKEN = 'TU_WKLEJ_SWÓJ_TOKEN'
-TELEGRAM_CHAT_ID = '7898261739'
+app = Flask(__name__)
 
-OLX_URL = "https://www.olx.pl/motoryzacja/maszyny-rolnicze/minikoparki/"
-CENA_MIN = 15000
-CENA_MAX = 80000
+TELEGRAM_TOKEN = 'TU_WSTAW_TOKEN'
+CHAT_ID = 'TU_WSTAW_CHAT_ID'
 
-bot = telegram.Bot(token=TELEGRAM_TOKEN)
-widziane_ogloszenia = set()
+bot = Bot(token=TELEGRAM_TOKEN)
 
-def sprawdz_olx():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(OLX_URL, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
+def track_olx():
+    while True:
+        try:
+            url = "https://www.olx.pl/motoryzacja/maszyny-rolnicze/koparki/"
+            response = requests.get(url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            first_offer = soup.find('div', {'data-cy': 'l-card'})
+            if first_offer:
+                title = first_offer.find('h6')
+                if title:
+                    bot.send_message(chat_id=CHAT_ID, text=f"Nowa oferta: {title.text.strip()}")
+        except Exception as e:
+            print(f"Błąd: {e}")
+        time.sleep(600)
 
-    for offer in soup.find_all('div', class_='css-1sw7q4x'):
-        link_tag = offer.find('a')
-        if link_tag:
-            link = "https://www.olx.pl" + link_tag.get('href')
-            title = offer.find('h6').text.strip() if offer.find('h6') else 'Brak tytułu'
-            price_text = offer.find('p').text if offer.find('p') else '0'
-            price_text = price_text.replace('zł', '').replace(' ', '').replace(',', '.')
-            try:
-                price = float(price_text)
-            except ValueError:
-                price = 0
+@app.route('/')
+def home():
+    return "Bot działa!"
 
-            if link not in widziane_ogloszenia and CENA_MIN <= price <= CENA_MAX:
-                widziane_ogloszenia.add(link)
-                bot.send_message(chat_id=TELEGRAM_CHAT_ID,
-                                 text=f"Nowa koparka!\n{title}\nCena: {price} zł\n{link}")
-
-while True:
-    sprawdz_olx()
-    time.sleep(300)
+if __name__ == '__main__':
+    threading.Thread(target=track_olx).start()
+    app.run(host='0.0.0.0', port=10000)
